@@ -43,6 +43,9 @@ Recent conversation:
 
 User message:
 {message}
+
+User Provided Image:
+{image_description}
 """
     else:
         context_prompt = f"""
@@ -54,9 +57,6 @@ Recent conversation:
 
 User message:
 {message}
-
-User Provided Image:
-{image_description}
 """
     
     messages = [{

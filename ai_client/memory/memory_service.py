@@ -8,7 +8,8 @@ def store_conversation(user_id, user_message, assistant_response):
         {"role": "assistant", "content": assistant_response}
     ]
 
-    memory_client.add(messages, user_id=user_id)
+    response = memory_client.add(messages, user_id=user_id)
+    print(f"Memory stored with response: {response}")
 
 
 def retrieve_memory(user_id, query):
@@ -25,4 +26,5 @@ def retrieve_memory(user_id, query):
         filters=filters
     )
 
+    print(f"Memory search results: {results}")
     return results
