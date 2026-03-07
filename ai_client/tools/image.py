@@ -8,19 +8,20 @@ def vision_tool(image_base64: str, prompt="Describe the image"):
     r = requests.post(
         "http://localhost:11434/api/chat",
         json={
-            "model": "qwen2.5vl:3b",
+            "model": "qwen2.5vl:7b",
+            "stream": False,
             "messages": [
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image", "image": image_base64}
-                    ]
+                    "content": prompt,
+                    "images": [image_base64]
                 }
             ]
         }
     )
 
-    print("[DEBUG] Response:", r.json())
+    print("[DEBUG] Response:", r.text)
+    data = r.json()
+    print("[DEBUG] JSON Response:", data)
 
-    return r.json()["message"]["content"]
+    return data["message"]["content"]

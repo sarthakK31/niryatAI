@@ -59,16 +59,16 @@ User Provided Image:
 {image_description}
 """
     
-    # messages = [{
-    #         "role": "user",
-    #         "content": [{"type": "text", "text": context_prompt}]
-    #     }]
+    messages = [{
+            "role": "user",
+            "content": [{"type": "text", "text": context_prompt}]
+        }]
 
     # 3 run your existing agent
-    response = run_agent(context_prompt)
+    response = run_agent(messages)
 
     # 5️⃣ store session messages
-    add_message(user_id, "user", message)
+    add_message(user_id, "user", messages)
     add_message(user_id, "assistant", response)
 
     # 4 store memory
