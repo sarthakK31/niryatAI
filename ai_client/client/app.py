@@ -17,7 +17,6 @@ from ai_client.tools.postgres_tools import (
     run_query,
     get_schema
 )
-from ai_client.tools.image import vision_tool
 #from strands_tools import mem0_memory
 
 import os
@@ -100,34 +99,10 @@ agent = Agent(
         describe_table,
         preview_table,
         run_query,
-        get_schema,
-        vision_tool
+        get_schema
     ], 
     system_prompt=SYSTEM_PROMPT
     )
-
-# response = agent(messages=[
-#     {
-#         "role": "user",
-#         "content": [{"text": "What are the Buckets accessible to you?"}]
-#     }
-# ])
-
-# print("Response:", str(response))
-
-# response = agent("What buckets are accessible to you?")
-# print(response)
-
-# response = agent("Give me the top 10 countries with best opportunities to export frozen shrimps and prawns")
-# print(response)
-
-
-
-# def run_agent(message: str, mem0_user_id: str, mem0_agent_id: str) -> str:
-#     response = agent(message, user_id=mem0_user_id, agent_id=mem0_agent_id)
-#     return str(response)
-
-# run_agent("I am a dealer dealing in frozen shrimps and prawns. They have an HS Code=30617. Can you please find me the top 2 countries where it would be beneficial for me to expand my business", mem0_user_id="dummy_user", mem0_agent_id="session_1")
 
 def run_agent(message: list[dict]) -> str: 
     response = agent(message) 

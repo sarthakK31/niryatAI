@@ -3,7 +3,7 @@ version: "3.8"
 services:
   postgres:
     image: postgres:15
-    container_name: pg-db
+    container_name: niryat-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -13,8 +13,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
-      - exportdata:/var/lib/postgresql/export
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
-  exportdata:

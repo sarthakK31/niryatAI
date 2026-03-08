@@ -13,13 +13,6 @@ def chat(user_id: str, message: str, media_type: str, image: str| None = None) -
     memories = retrieve_memory(user_id, message)
 
     # 2 build context prompt
-#     context_prompt = f"""
-# Previous known information about this user:
-# {memories}
-
-# User message:
-# {message}
-# """
     context_prompt = f"""
 Known long-term memory:
 {memories}
