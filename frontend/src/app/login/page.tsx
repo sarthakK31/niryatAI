@@ -46,7 +46,7 @@ export default function LoginPage() {
           onSubmit={handleSubmit}
           className="bg-[var(--bg-card)] rounded-xl p-8 border border-[var(--border)] space-y-5"
         >
-          <h2 className="text-xl font-semibold text-center">Sign In12</h2>
+          <h2 className="text-xl font-semibold text-center">Sign In</h2>
 
           {error && (
             <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-2 rounded-lg text-sm">
