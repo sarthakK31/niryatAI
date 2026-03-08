@@ -59,7 +59,9 @@ export default function ProfilePage() {
         hs_codes: hsCodes.length > 0 ? hsCodes : undefined,
         state: form.state || undefined,
       });
+      console.log("[DEBUG] Updated profile:", updated);
       setData(updated);
+      setHsCodes(updated.hs_codes || []);
       // Update localStorage
       localStorage.setItem("niryat_user", JSON.stringify(updated));
       setMessage("Profile updated successfully!");

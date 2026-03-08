@@ -1,21 +1,23 @@
-"""Niryat AI Agent - Redesigned with hallucination guardrails and reliable tool use."""
+"""Niryat AI Agent - Supports both AWS Bedrock (production) and Ollama (local dev)."""
 
 from strands import Agent
-from strands.models.ollama import OllamaModel
 from strands import tool
 import boto3
 import psycopg2
 import pandas as pd
-import requests
 import re
+import json
+import base64
 from app.config import (
+    MODEL_PROVIDER, AWS_REGION,
+    BEDROCK_MODEL_ID, BEDROCK_VISION_MODEL_ID,
     OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_VISION_MODEL,
-    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET,
+    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET,
     DATABASE_URL,
 )
 
 # ============================
-# SYSTEM PROMPT (v2 - improved)
+# SYSTEM PROMPT
 # ============================
 
 SYSTEM_PROMPT = """You are Niryat AI, an expert export readiness advisor for Indian MSMEs (Micro, Small and Medium Enterprises).
@@ -32,7 +34,7 @@ You have access to these tools — ALWAYS use them instead of guessing:
 
    Tables available:
    - market_intelligence (country, hs_code, avg_growth_5y, volatility, total_import, opportunity_score, ai_summary)
-   - country_risk (country, stability_index, risk_score)
+   - country_risk (country, stability_index, risk_score)  
 
 2. S3 DOCUMENT STORE (export procedures):
    - search_export_docs: Search for export guidance documents by keyword
@@ -91,12 +93,15 @@ def _get_db_connection():
 
 
 def _get_s3_client():
-    return boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_REGION,
-    )
+    if AWS_ACCESS_KEY_ID:
+        return boto3.client(
+            "s3",
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION,
+        )
+    # On EC2/ECS, use IAM role credentials automatically
+    return boto3.client("s3", region_name=AWS_REGION)
 
 
 ALLOWED_TABLES = {"market_intelligence", "country_risk"}
@@ -118,7 +123,6 @@ def query_market_data(sql_query: str) -> str:
     if any(kw in lower for kw in BLOCKED_KEYWORDS):
         return "ERROR: This query contains blocked keywords. Only SELECT queries are allowed."
 
-    # Validate tables
     referenced = re.findall(r'(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)', lower)
     for t in referenced:
         if t not in ALLOWED_TABLES:
@@ -132,11 +136,10 @@ def query_market_data(sql_query: str) -> str:
         if df.empty:
             return "No results found for this query. The data may not exist in the database for the specified filters."
 
-        # Format results clearly
         if len(df) <= 25:
             return df.to_string(index=False)
         else:
-            return df.head(25).to_string(index=False) + f"\n\n... showing 25 of {len(df)} results. Refine your query for more specific data."
+            return df.head(25).to_string(index=False) + f"\n\n... showing 25 of {len(df)} results."
 
     except Exception as e:
         return f"ERROR executing query: {str(e)}. Please check the SQL syntax and try again."
@@ -199,7 +202,6 @@ def read_export_doc(document_key: str) -> str:
         s3 = _get_s3_client()
         obj = s3.get_object(Bucket=S3_BUCKET, Key=document_key)
         content = obj["Body"].read().decode("utf-8")
-        # Truncate very long docs
         if len(content) > 4000:
             return content[:4000] + "\n\n[Document truncated. Key information is in the section above.]"
         return content
@@ -222,7 +224,43 @@ def analyze_image(image_description: str) -> str:
 # ============================
 
 def process_image(image_base64: str) -> str:
-    """Process an image using Ollama's vision model."""
+    """Process an image using the configured vision model."""
+    if MODEL_PROVIDER == "bedrock":
+        return _process_image_bedrock(image_base64)
+    else:
+        return _process_image_ollama(image_base64)
+
+
+def _process_image_bedrock(image_base64: str) -> str:
+    """Process image using Bedrock's Claude vision."""
+    try:
+        client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+        response = client.converse(
+            modelId=BEDROCK_VISION_MODEL_ID,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "image": {
+                            "format": "png",
+                            "source": {"bytes": base64.b64decode(image_base64)},
+                        }
+                    },
+                    {
+                        "text": "Describe this image in detail. If it contains a form, certificate, document, or label, extract all visible text and explain what the document is."
+                    },
+                ],
+            }],
+            inferenceConfig={"maxTokens": 1024},
+        )
+        return response["output"]["message"]["content"][0]["text"]
+    except Exception as e:
+        return f"Could not process image: {str(e)}"
+
+
+def _process_image_ollama(image_base64: str) -> str:
+    """Process image using local Ollama vision model."""
+    import requests
     try:
         r = requests.post(
             f"{OLLAMA_HOST}/api/chat",
@@ -247,14 +285,41 @@ def process_image(image_base64: str) -> str:
 # ============================
 
 def create_agent() -> Agent:
-    """Create and return a configured Niryat AI agent."""
-    ollama_model = OllamaModel(
-        host=OLLAMA_HOST,
-        model_id=OLLAMA_MODEL,
-    )
+    """Create agent using configured model provider."""
+    if MODEL_PROVIDER == "bedrock":
+        from strands.models.bedrock import BedrockModel
+        model = BedrockModel(
+            model_id=BEDROCK_MODEL_ID,
+            region_name=AWS_REGION,
+        )
+        print(f"[AGENT] Using Bedrock model: {BEDROCK_MODEL_ID}")
+    else:
+        from strands.models.ollama import OllamaModel
+        from strands.models.gemini import GeminiModel
+
+        model = GeminiModel(
+            client_args={
+                "api_key": "AIzaSyDCZLkJzjSB2TpN4q4NelaZSO9phIZ9X1w",
+            },
+            # **model_config
+            model_id="gemini-2.5-flash",
+            params={
+                # some sample model parameters
+                "temperature": 0.7,
+                "max_output_tokens": 2048,
+                "top_p": 0.9,
+                "top_k": 40
+            }
+        )
+
+        # model = OllamaModel(
+        #     host=OLLAMA_HOST,
+        #     model_id=OLLAMA_MODEL,
+        # )
+        # print(f"[AGENT] Using Ollama model: {OLLAMA_MODEL}")
 
     return Agent(
-        model=ollama_model,
+        model=model,
         tools=[
             query_market_data,
             get_table_info,
@@ -284,14 +349,12 @@ def run_agent_with_context(
     image_base64: str = None,
 ) -> str:
     """Run the agent with full context injection."""
-
     agent = get_agent()
 
-    # Build the context-enriched prompt
     parts = []
 
     if user_profile:
-        profile_ctx = f"""User Profile:
+        profile_ctx = f"""User Profile: (Use this to personalize responses)
 - Name: {user_profile.get('full_name', 'Unknown')}
 - Company: {user_profile.get('company_name', 'Not specified')}
 - Products (HS codes): {', '.join(user_profile.get('hs_codes') or ['Not specified'])}
@@ -301,7 +364,6 @@ def run_agent_with_context(
     if conversation_history:
         parts.append(f"Recent conversation:\n{conversation_history}")
 
-    # Handle image
     image_desc = None
     if image_base64:
         image_desc = process_image(image_base64)

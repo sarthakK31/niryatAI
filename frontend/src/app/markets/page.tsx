@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import AuthLayout from "@/components/AuthLayout";
+import ExportMap, { MapMarket } from "@/components/ExportMap";
 import { markets } from "@/lib/api";
-import { Globe2, TrendingUp, Shield, Filter } from "lucide-react";
+import { Globe2, TrendingUp, Shield, Filter, Map } from "lucide-react";
 
 interface MarketRow {
   country: string;
@@ -17,6 +18,7 @@ interface MarketRow {
 
 export default function MarketsPage() {
   const [data, setData] = useState<MarketRow[]>([]);
+  const [mapData, setMapData] = useState<MapMarket[]>([]);
   const [hsCodes, setHsCodes] = useState<string[]>([]);
   const [selectedHs, setSelectedHs] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function MarketsPage() {
   useEffect(() => {
     markets.hsCodes().then(setHsCodes).catch(console.error);
     markets.top().then((d) => { setData(d); setLoading(false); }).catch(console.error);
+    markets.mapData().then(setMapData).catch(console.error);
   }, []);
 
   const filterByHs = (code: string) => {
@@ -46,6 +49,11 @@ export default function MarketsPage() {
     return "text-red-400";
   };
 
+  // Filter map data by selected HS code
+  const filteredMapData = selectedHs
+    ? mapData.filter((d) => d.hs_code === selectedHs)
+    : mapData;
+
   return (
     <AuthLayout>
       <div className="max-w-7xl mx-auto space-y-6">
@@ -55,7 +63,7 @@ export default function MarketsPage() {
               <Globe2 className="text-[var(--accent)]" /> Market Intelligence
             </h1>
             <p className="text-[var(--text-secondary)] mt-1">
-              Discover the best export markets for your products
+              Export opportunities for your products
             </p>
           </div>
 
@@ -67,7 +75,7 @@ export default function MarketsPage() {
               onChange={(e) => filterByHs(e.target.value)}
               className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-white text-sm focus:border-[var(--primary-light)] focus:outline-none"
             >
-              <option value="">All HS Codes</option>
+              <option value="">All My HS Codes</option>
               {hsCodes.map((code) => (
                 <option key={code} value={code}>
                   HS {code}
@@ -76,6 +84,17 @@ export default function MarketsPage() {
             </select>
           </div>
         </div>
+
+        {/* Export Opportunity Map */}
+        {mapData.length > 0 && (
+          <div className="bg-[var(--bg-card)] rounded-xl p-5 border border-[var(--border)]">
+            <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+              <Map size={20} className="text-[var(--accent)]" />
+              Export Opportunity Map
+            </h2>
+            <ExportMap data={filteredMapData} />
+          </div>
+        )}
 
         {/* Top 3 Cards */}
         {!loading && data.length > 0 && (
@@ -110,6 +129,19 @@ export default function MarketsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* No data message */}
+        {!loading && data.length === 0 && hsCodes.length === 0 && (
+          <div className="bg-[var(--bg-card)] rounded-xl p-8 border border-[var(--border)] text-center">
+            <Globe2 size={48} className="mx-auto text-[var(--text-secondary)] mb-3" />
+            <h3 className="text-lg font-semibold mb-1">No HS Codes Configured</h3>
+            <p className="text-[var(--text-secondary)] text-sm">
+              Add your product HS codes in your{" "}
+              <a href="/profile" className="text-[var(--primary-light)] underline">profile</a>{" "}
+              to see market intelligence.
+            </p>
           </div>
         )}
 

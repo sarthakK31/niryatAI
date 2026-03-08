@@ -87,6 +87,7 @@ def update_user(user_id: str, full_name: str = None, company_name: str = None,
         updates.append("company_name = %s")
         params.append(company_name)
     if hs_codes is not None:
+        print("[DEBUG] Received HS Codes: ", hs_codes)
         updates.append("hs_codes = %s")
         params.append(hs_codes)
     if state is not None:
@@ -105,6 +106,7 @@ def update_user(user_id: str, full_name: str = None, company_name: str = None,
             RETURNING id, email, full_name, company_name, hs_codes, state, created_at
         """, params)
         row = cur.fetchone()
+    print("[DEBUG] Updated User Row: ", row)
     return {
         "id": str(row[0]), "email": row[1], "full_name": row[2],
         "company_name": row[3], "hs_codes": row[4], "state": row[5],

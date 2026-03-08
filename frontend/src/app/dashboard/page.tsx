@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import AuthLayout from "@/components/AuthLayout";
+import ExportMap, { MapMarket } from "@/components/ExportMap";
 import { dashboard } from "@/lib/api";
 import Link from "next/link";
 import {
@@ -9,6 +10,7 @@ import {
   Globe2,
   TrendingUp,
   ArrowRight,
+  Map,
 } from "lucide-react";
 
 interface DashboardData {
@@ -24,6 +26,7 @@ interface DashboardData {
     hs_code: string;
     opportunity_score: number;
   }>;
+  map_data: MapMarket[];
 }
 
 export default function DashboardPage() {
@@ -121,6 +124,25 @@ useEffect(() => {
             </div>
           </Link>
         </div>
+
+        {/* Export Opportunity Map */}
+        {data?.map_data && data.map_data.length > 0 && (
+          <div className="bg-[var(--bg-card)] rounded-xl p-5 border border-[var(--border)]">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Map size={20} className="text-[var(--accent)]" />
+                Export Opportunities
+              </h2>
+              <Link
+                href="/markets"
+                className="text-sm text-[var(--primary-light)] hover:underline flex items-center gap-1"
+              >
+                View details <ArrowRight size={14} />
+              </Link>
+            </div>
+            <ExportMap data={data.map_data} compact />
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

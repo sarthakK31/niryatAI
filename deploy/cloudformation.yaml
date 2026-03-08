@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Niryat AI - Export Intelligence Platform (Hackathon Deploy)"
+
+Parameters:
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: "PostgreSQL master password (min 8 chars)"
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: "Existing EC2 key pair for SSH access"
+
+  S3ExportDocsBucket:
+    Type: String
+    Default: "niryat-export-docs"
+    Description: "Your existing S3 bucket with export guidance documents"
+
+  BedrockModelId:
+    Type: String
+    Default: "deepseek.v3.2"
+    Description: "Bedrock model ID for the AI agent"
+
+  GitRepoURL:
+    Type: String
+    Description: "Git clone URL for your repo (https://github.com/user/niryatAI.git)"
+
+Resources:
+
+  # ==========================================
+  # NETWORKING - Security Groups
+  # ==========================================
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Niryat backend - SSH + API"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: niryat-ec2-sg
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Niryat RDS - Postgres access from EC2"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !GetAtt EC2SecurityGroup.GroupId
+        # Also allow from your local machine for schema loading
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: niryat-rds-sg
+
+  # ==========================================
+  # DATABASE - RDS PostgreSQL (Free Tier)
+  # ==========================================
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: niryat-db
+      DBInstanceClass: db.t3.micro
+      Engine: postgres
+      EngineVersion: "15"
+      MasterUsername: postgres
+      MasterUserPassword: !Ref DBPassword
+      AllocatedStorage: 20
+      DBName: niryatdb
+      PubliclyAccessible: true
+      MultiAZ: false
+      BackupRetentionPeriod: 1
+      VPCSecurityGroups:
+        - !GetAtt RDSSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: niryat-db
+
+  # ==========================================
+  # IAM - EC2 Role with Bedrock + S3 access
+  # ==========================================
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: NiryatEC2Role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: NiryatEC2Profile
+      Roles:
+        - !Ref EC2Role
+
+  # ==========================================
+  # COMPUTE - EC2 Instance with Docker
+  # ==========================================
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: niryat-eip
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: Database
+    Properties:
+      InstanceType: t3.small
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      KeyName: !Ref KeyPairName
+      SecurityGroupIds:
+        - !GetAtt EC2SecurityGroup.GroupId
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      Tags:
+        - Key: Name
+          Value: niryat-backend
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y docker git postgresql15
+          systemctl start docker
+          systemctl enable docker
+          usermod -aG docker ec2-user
+
+          # Clone repo
+          cd /home/ec2-user
+          git clone ${GitRepoURL} niryatAI
+          chown -R ec2-user:ec2-user niryatAI
+
+          # Create backend .env
+          cat > /home/ec2-user/niryatAI/backend/.env << 'ENVEOF'
+          DATABASE_URL=postgresql://postgres:${DBPassword}@${Database.Endpoint.Address}:5432/niryatdb
+          AWS_REGION=${AWS::Region}
+          S3_BUCKET=${S3ExportDocsBucket}
+          MODEL_PROVIDER=bedrock
+          BEDROCK_MODEL_ID=${BedrockModelId}
+          BEDROCK_VISION_MODEL_ID=${BedrockModelId}
+          JWT_SECRET=$(head -c 32 /dev/urandom | base64)
+          FRONTEND_URL=*
+          ENVEOF
+
+          # Build and run backend
+          cd /home/ec2-user/niryatAI/backend
+          docker build -t niryat-backend .
+          docker run -d --name niryat-api -p 8000:8000 \
+            --env-file .env \
+            --restart unless-stopped \
+            niryat-backend
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref EC2Instance
+      EIP: !Ref ElasticIP
+
+  # ==========================================
+  # FRONTEND - S3 Bucket for Static Hosting
+  # ==========================================
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "niryat-frontend-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  # ==========================================
+  # CDN - CloudFront Distribution
+  # ==========================================
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: "Niryat AI Frontend"
+        Origins:
+          - Id: S3Origin
+            DomainName: !Sub "${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          DefaultTTL: 86400
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 300
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 300
+
+# ==========================================
+# OUTPUTS - Everything you need after deploy
+# ==========================================
+Outputs:
+  BackendURL:
+    Description: "Backend API URL"
+    Value: !Sub "http://${ElasticIP}:8000"
+
+  BackendHealthCheck:
+    Description: "Test the backend is running"
+    Value: !Sub "curl http://${ElasticIP}:8000/health"
+
+  RDSEndpoint:
+    Description: "PostgreSQL connection endpoint"
+    Value: !GetAtt Database.Endpoint.Address
+
+  DatabaseURL:
+    Description: "Full DATABASE_URL for manual operations"
+    Value: !Sub "postgresql://postgres:YOUR_PASSWORD@${Database.Endpoint.Address}:5432/niryatdb"
+
+  FrontendBucketName:
+    Description: "S3 bucket for frontend deploy"
+    Value: !Ref FrontendBucket
+
+  FrontendWebsiteURL:
+    Description: "S3 website URL (direct)"
+    Value: !GetAtt FrontendBucket.WebsiteURL
+
+  CloudFrontURL:
+    Description: "CloudFront URL (use this for the demo)"
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+
+  SSHCommand:
+    Description: "SSH into EC2"
+    Value: !Sub "ssh -i ${KeyPairName}.pem ec2-user@${ElasticIP}"
+
+  SchemaLoadCommand:
+    Description: "Run this to load database schema"
+    Value: !Sub "psql -h ${Database.Endpoint.Address} -U postgres -d niryatdb -f db-init/01-schema.sql"

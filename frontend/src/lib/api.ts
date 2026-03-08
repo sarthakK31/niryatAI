@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -92,6 +92,7 @@ export const markets = {
   risks: () => request("/markets/risks"),
   hsCodes: () => request("/markets/hs-codes"),
   myMarkets: () => request("/markets/my-markets"),
+  mapData: () => request("/markets/map-data"),
 };
 
 // Profile

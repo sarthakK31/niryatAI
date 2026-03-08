@@ -3,10 +3,15 @@
 from app.database import get_cursor
 
 
-def get_top_markets(hs_code: str = None, limit: int = 20):
-    """Get top markets by opportunity score, optionally filtered by HS code."""
+def get_top_markets(user_hs_codes: list[str], hs_code: str = None, limit: int = 20):
+    """Get top markets filtered to user's HS codes, optionally narrowed to one."""
+    if not user_hs_codes:
+        return []
     with get_cursor() as cur:
         if hs_code:
+            # Single HS code filter — still must belong to user
+            if hs_code not in user_hs_codes:
+                return []
             cur.execute("""
                 SELECT mi.country, mi.hs_code, mi.avg_growth_5y, mi.volatility,
                        mi.total_import, mi.opportunity_score, mi.ai_summary,
@@ -24,9 +29,10 @@ def get_top_markets(hs_code: str = None, limit: int = 20):
                        cr.stability_index, cr.risk_score
                 FROM market_intelligence mi
                 LEFT JOIN country_risk cr ON cr.country = mi.country
+                WHERE mi.hs_code = ANY(%s)
                 ORDER BY mi.opportunity_score DESC
                 LIMIT %s
-            """, (limit,))
+            """, (user_hs_codes, limit))
         rows = cur.fetchall()
 
     return [
@@ -60,13 +66,46 @@ def get_country_risks(limit: int = 50):
     ]
 
 
-def get_available_hs_codes():
-    """Get distinct HS codes in the database."""
+def get_user_hs_codes(user_hs_codes: list[str]):
+    """Get user's HS codes that exist in market_intelligence."""
+    if not user_hs_codes:
+        return []
     with get_cursor() as cur:
         cur.execute("""
-            SELECT DISTINCT hs_code FROM market_intelligence ORDER BY hs_code
-        """)
+            SELECT DISTINCT hs_code FROM market_intelligence
+            WHERE hs_code = ANY(%s)
+            ORDER BY hs_code
+        """, (user_hs_codes,))
         return [r[0] for r in cur.fetchall()]
+
+
+def get_map_data(user_hs_codes: list[str]):
+    """Get top 10 countries per HS code for the map visualization."""
+    if not user_hs_codes:
+        return []
+    with get_cursor() as cur:
+        cur.execute("""
+            SELECT country, hs_code, opportunity_score, total_import, avg_growth_5y
+            FROM (
+                SELECT mi.country, mi.hs_code, mi.opportunity_score,
+                       mi.total_import, mi.avg_growth_5y,
+                       ROW_NUMBER() OVER (PARTITION BY mi.hs_code ORDER BY mi.opportunity_score DESC) AS rn
+                FROM market_intelligence mi
+                WHERE mi.hs_code = ANY(%s)
+            ) ranked
+            WHERE rn <= 10
+            ORDER BY hs_code, opportunity_score DESC
+        """, (user_hs_codes,))
+        rows = cur.fetchall()
+    return [
+        {
+            "country": r[0], "hs_code": r[1],
+            "opportunity_score": float(r[2]) if r[2] else None,
+            "total_import": float(r[3]) if r[3] else None,
+            "avg_growth_5y": float(r[4]) if r[4] else None,
+        }
+        for r in rows
+    ]
 
 
 def get_market_summary_for_user(hs_codes: list[str]):
