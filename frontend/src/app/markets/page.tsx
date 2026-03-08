@@ -49,6 +49,13 @@ export default function MarketsPage() {
     return "text-red-400";
   };
 
+  const riskColor = (score: number | null) => {
+    if (!score) return "text-gray-400";
+    if (score >= 0.7) return "text-red-400";
+    if (score >= 0.4) return "text-[var(--accent)]";
+    return "text-[var(--success)]";
+  };
+
   // Filter map data by selected HS code
   const filteredMapData = selectedHs
     ? mapData.filter((d) => d.hs_code === selectedHs)
@@ -197,7 +204,7 @@ export default function MarketsPage() {
                       <td className="px-4 py-3 text-right">
                         {row.avg_growth_5y ? `${(row.avg_growth_5y * 100).toFixed(1)}%` : "—"}
                       </td>
-                      <td className={`px-4 py-3 text-right ${scoreColor(row.risk_score)}`}>
+                      <td className={`px-4 py-3 text-right ${riskColor(row.risk_score)}`}>
                         {row.risk_score?.toFixed(2) ?? "—"}
                       </td>
                     </tr>

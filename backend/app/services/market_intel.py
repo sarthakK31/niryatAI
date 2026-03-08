@@ -109,18 +109,22 @@ def get_map_data(user_hs_codes: list[str]):
 
 
 def get_market_summary_for_user(hs_codes: list[str]):
-    """Get a summary of best markets for a user's product codes."""
+    """Get the top market (by opportunity score) for each of the user's HS codes."""
     if not hs_codes:
         return []
     with get_cursor() as cur:
         cur.execute("""
-            SELECT mi.country, mi.hs_code, mi.opportunity_score, mi.ai_summary,
-                   cr.risk_score
-            FROM market_intelligence mi
-            LEFT JOIN country_risk cr ON cr.country = mi.country
-            WHERE mi.hs_code = ANY(%s)
-            ORDER BY mi.opportunity_score DESC
-            LIMIT 10
+            SELECT country, hs_code, opportunity_score, ai_summary, risk_score
+            FROM (
+                SELECT mi.country, mi.hs_code, mi.opportunity_score, mi.ai_summary,
+                       cr.risk_score,
+                       ROW_NUMBER() OVER (PARTITION BY mi.hs_code ORDER BY mi.opportunity_score DESC) AS rn
+                FROM market_intelligence mi
+                LEFT JOIN country_risk cr ON cr.country = mi.country
+                WHERE mi.hs_code = ANY(%s)
+            ) ranked
+            WHERE rn = 1
+            ORDER BY opportunity_score DESC
         """, (hs_codes,))
         rows = cur.fetchall()
     return [

@@ -13,6 +13,13 @@ import {
   Map,
 } from "lucide-react";
 
+interface TopMarket {
+  country: string;
+  hs_code: string;
+  opportunity_score: number;
+  ai_summary?: string;
+}
+
 interface DashboardData {
   user: { name: string; company: string | null };
   readiness: {
@@ -21,16 +28,13 @@ interface DashboardData {
     percentage: number;
     next_step: string;
   };
-  top_markets: Array<{
-    country: string;
-    hs_code: string;
-    opportunity_score: number;
-  }>;
+  top_markets: TopMarket[];
   map_data: MapMarket[];
 }
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [showAllMarkets, setShowAllMarkets] = useState(false);
 
 useEffect(() => {
   const token = localStorage.getItem("niryat_token");
@@ -86,20 +90,44 @@ useEffect(() => {
             )}
           </div>
 
-          {/* Top Market */}
+          {/* Top Markets */}
           <div className="bg-[var(--bg-card)] rounded-xl p-6 border border-[var(--border)]">
             <div className="flex items-center gap-3 mb-4">
               <TrendingUp className="text-[var(--primary-light)]" size={24} />
-              <h3 className="font-semibold">Top Market</h3>
+              <h3 className="font-semibold">Top Markets</h3>
             </div>
-            {data?.top_markets?.[0] ? (
-              <>
-                <div className="text-3xl font-bold">{data.top_markets[0].country}</div>
-                <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  HS {data.top_markets[0].hs_code} — Score:{" "}
-                  {data.top_markets[0].opportunity_score?.toFixed(2)}
-                </p>
-              </>
+            {data?.top_markets && data.top_markets.length > 0 ? (
+              <div className="space-y-3">
+                {(showAllMarkets ? data.top_markets : data.top_markets.slice(0, 5)).map((m) => (
+                  <div
+                    key={m.hs_code}
+                    className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-main)] border border-[var(--border)]"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{m.country}</div>
+                      <div className="text-xs text-[var(--text-secondary)]">
+                        HS {m.hs_code}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <div className="text-sm font-bold text-[var(--success)]">
+                        {m.opportunity_score?.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-[var(--text-secondary)]">Score</div>
+                    </div>
+                  </div>
+                ))}
+                {data.top_markets.length > 5 && (
+                  <button
+                    onClick={() => setShowAllMarkets(!showAllMarkets)}
+                    className="text-sm text-[var(--primary-light)] hover:underline w-full text-center pt-1"
+                  >
+                    {showAllMarkets
+                      ? "Show less"
+                      : `View all ${data.top_markets.length} markets`}
+                  </button>
+                )}
+              </div>
             ) : (
               <p className="text-[var(--text-secondary)]">
                 Add your HS codes in profile to see market recommendations
