@@ -299,7 +299,7 @@ def create_agent() -> Agent:
 
         model = GeminiModel(
             client_args={
-                "api_key": "AIzaSyDCZLkJzjSB2TpN4q4NelaZSO9phIZ9X1w",
+                "api_key": "",
             },
             # **model_config
             model_id="gemini-2.5-flash",
