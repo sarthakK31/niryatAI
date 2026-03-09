@@ -15,8 +15,11 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 S3_BUCKET = os.getenv("S3_BUCKET", "niryat-export-docs")
 
-# Model provider: "bedrock" or "ollama"
+# Model provider: "bedrock", "ollama", or "gemini"
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "bedrock")
+
+# Gemini
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Bedrock
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514")

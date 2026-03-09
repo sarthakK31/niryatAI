@@ -13,7 +13,7 @@ from app.config import (
     BEDROCK_MODEL_ID, BEDROCK_VISION_MODEL_ID,
     OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_VISION_MODEL,
     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET,
-    DATABASE_URL,
+    DATABASE_URL, GEMINI_API_KEY,
 )
 
 # ============================
@@ -40,7 +40,11 @@ You have access to these tools — ALWAYS use them instead of guessing:
    - search_export_docs: Search for export guidance documents by keyword
    - read_export_doc: Read a specific document from S3
 
-3. IMAGE PROCESSING:
+3. USER PROGRESS TRACKING:
+   - get_user_progress: Get the user's export readiness checklist progress, completed steps, and next recommended action
+   Use this when the user asks about their progress, what to do next, where they stand, or anything about their export readiness journey.
+
+4. IMAGE PROCESSING:
    - analyze_image: Extract and describe text from an uploaded image
 
 CRITICAL RULES — YOU MUST FOLLOW THESE:
@@ -52,6 +56,7 @@ CRITICAL RULES — YOU MUST FOLLOW THESE:
 2. ALWAYS USE TOOLS FIRST.
    - For market/trade questions → query_market_data
    - For export process questions → search_export_docs, then read_export_doc
+   - For progress/readiness/next-step questions → get_user_progress
    - For image questions → analyze_image
    - NEVER answer a data question from memory alone.
 
@@ -106,6 +111,9 @@ def _get_s3_client():
 
 ALLOWED_TABLES = {"market_intelligence", "country_risk"}
 BLOCKED_KEYWORDS = {"insert", "update", "delete", "drop", "alter", "truncate", "create", "grant", "revoke"}
+
+# Current user context — set before each agent invocation
+_current_user_id = None
 
 
 @tool
@@ -219,6 +227,77 @@ def analyze_image(image_description: str) -> str:
     return f"Image analysis:\n{image_description}"
 
 
+@tool
+def get_user_progress() -> str:
+    """
+    Get the current user's export readiness progress and next steps.
+    Use this when the user asks about their progress, where they are in the export journey,
+    what they should do next, or anything related to their export readiness checklist.
+    Returns: overall completion percentage, completed steps, and the next recommended step.
+    """
+    global _current_user_id
+    if not _current_user_id:
+        return "Unable to retrieve progress: user not identified."
+
+    try:
+        conn = _get_db_connection()
+        cur = conn.cursor()
+
+        # Get all steps with user's completion status
+        cur.execute("""
+            SELECT
+                es.step_number,
+                es.title AS step_title,
+                es.category,
+                sub.substep_number,
+                sub.title AS substep_title,
+                COALESCE(ur.completed, false) AS completed,
+                ur.completed_at
+            FROM export_steps es
+            JOIN export_substeps sub ON sub.step_id = es.id
+            LEFT JOIN user_readiness ur ON ur.substep_id = sub.id AND ur.user_id = %s
+            ORDER BY es.step_number, sub.substep_number
+        """, (_current_user_id,))
+        rows = cur.fetchall()
+        conn.close()
+
+        if not rows:
+            return "No export readiness steps found in the system."
+
+        total = len(rows)
+        done = sum(1 for r in rows if r[5])
+        pct = round(done / total * 100, 1) if total > 0 else 0
+
+        # Build step-by-step summary
+        steps = {}
+        next_step = None
+        for r in rows:
+            step_num, step_title, category, sub_num, sub_title, completed, completed_at = r
+            if step_num not in steps:
+                steps[step_num] = {"title": step_title, "category": category, "substeps": []}
+            status = "DONE" if completed else "PENDING"
+            steps[step_num]["substeps"].append(f"  {sub_num}. [{status}] {sub_title}")
+            if not completed and next_step is None:
+                next_step = f"Step {step_num}: {step_title} → {sub_title}"
+
+        lines = [f"Export Readiness: {pct}% complete ({done}/{total} substeps done)\n"]
+        for step_num in sorted(steps.keys()):
+            s = steps[step_num]
+            lines.append(f"Step {step_num}: {s['title']} ({s['category']})")
+            lines.extend(s["substeps"])
+            lines.append("")
+
+        if next_step:
+            lines.append(f"NEXT RECOMMENDED ACTION: {next_step}")
+        else:
+            lines.append("All steps completed! The user is export-ready.")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"ERROR fetching progress: {str(e)}"
+
+
 # ============================
 # VISION PROCESSING
 # ============================
@@ -227,6 +306,8 @@ def process_image(image_base64: str) -> str:
     """Process an image using the configured vision model."""
     if MODEL_PROVIDER == "bedrock":
         return _process_image_bedrock(image_base64)
+    elif MODEL_PROVIDER == "gemini":
+        return _process_image_gemini(image_base64)
     else:
         return _process_image_ollama(image_base64)
 
@@ -258,6 +339,37 @@ def _process_image_bedrock(image_base64: str) -> str:
         return f"Could not process image: {str(e)}"
 
 
+def _process_image_gemini(image_base64: str) -> str:
+    """Process image using Google Gemini vision."""
+    import requests
+    try:
+        r = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}",
+            json={
+                "contents": [{
+                    "parts": [
+                        {
+                            "inline_data": {
+                                "mime_type": "image/png",
+                                "data": image_base64,
+                            }
+                        },
+                        {
+                            "text": "Describe this image in detail. If it contains a form, certificate, document, or label, extract all visible text and explain what the document is."
+                        },
+                    ]
+                }],
+                "generationConfig": {"maxOutputTokens": 1024},
+            },
+            timeout=120,
+        )
+        r.raise_for_status()
+        result = r.json()
+        return result["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        return f"Could not process image: {str(e)}"
+
+
 def _process_image_ollama(image_base64: str) -> str:
     """Process image using local Ollama vision model."""
     import requests
@@ -273,7 +385,7 @@ def _process_image_ollama(image_base64: str) -> str:
                     "images": [image_base64],
                 }],
             },
-            timeout=60,
+            timeout=300,
         )
         return r.json()["message"]["content"]
     except Exception as e:
@@ -293,30 +405,30 @@ def create_agent() -> Agent:
             region_name=AWS_REGION,
         )
         print(f"[AGENT] Using Bedrock model: {BEDROCK_MODEL_ID}")
-    else:
-        from strands.models.ollama import OllamaModel
+    elif MODEL_PROVIDER == "gemini":
         from strands.models.gemini import GeminiModel
 
         model = GeminiModel(
             client_args={
-                "api_key": "",
+                "api_key": GEMINI_API_KEY,
             },
-            # **model_config
             model_id="gemini-2.5-flash",
             params={
-                # some sample model parameters
                 "temperature": 0.7,
                 "max_output_tokens": 2048,
                 "top_p": 0.9,
                 "top_k": 40
             }
         )
+        print(f"[AGENT] Using Gemini model: gemini-2.5-flash")
+    else:
+        from strands.models.ollama import OllamaModel
 
-        # model = OllamaModel(
-        #     host=OLLAMA_HOST,
-        #     model_id=OLLAMA_MODEL,
-        # )
-        # print(f"[AGENT] Using Ollama model: {OLLAMA_MODEL}")
+        model = OllamaModel(
+            host=OLLAMA_HOST,
+            model_id=OLLAMA_MODEL,
+        )
+        print(f"[AGENT] Using Ollama model: {OLLAMA_MODEL}")
 
     return Agent(
         model=model,
@@ -326,6 +438,7 @@ def create_agent() -> Agent:
             search_export_docs,
             read_export_doc,
             analyze_image,
+            get_user_progress,
         ],
         system_prompt=SYSTEM_PROMPT,
     )
@@ -349,6 +462,9 @@ def run_agent_with_context(
     image_base64: str = None,
 ) -> str:
     """Run the agent with full context injection."""
+    global _current_user_id
+    _current_user_id = user_profile.get("id") if user_profile else None
+
     agent = get_agent()
 
     parts = []

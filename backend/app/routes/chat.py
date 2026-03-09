@@ -1,3 +1,5 @@
+import asyncio
+import base64
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from app.middleware import get_current_user
 from app.services.chat_persistence import (
@@ -6,7 +8,6 @@ from app.services.chat_persistence import (
 )
 from app.services.agent import run_agent_with_context, process_image
 from app.models.schemas import ChatResponse, ChatSession, ChatMessage
-import base64
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -46,8 +47,9 @@ async def send_message(
     # Store user message
     add_message(session_id, "user", message)
 
-    # Run agent
-    response = run_agent_with_context(
+    # Run agent in a thread to avoid blocking the async event loop
+    response = await asyncio.to_thread(
+        run_agent_with_context,
         user_message=message,
         conversation_history=history,
         user_profile=user,

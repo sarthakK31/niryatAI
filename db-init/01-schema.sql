@@ -161,3 +161,21 @@ INSERT INTO export_substeps (step_id, substep_number, title, description) VALUES
 (10, 2, 'Set up AD bank account', 'Ensure your bank is authorized dealer for forex'),
 (10, 3, 'Choose payment terms', 'Decide between LC, TT, DP, DA etc.')
 ON CONFLICT DO NOTHING;
+
+
+-- HS CODE MAPPING TABLE:
+
+CREATE TABLE hs_code_reference (
+    id SERIAL PRIMARY KEY,
+    hs_code TEXT UNIQUE NOT NULL,
+    product_description TEXT,
+    india_hs_code TEXT,
+    usa_hts_code TEXT,
+    eu_cn_code TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE INDEX idx_hs_reference_code ON hs_code_reference(hs_code);
+CREATE INDEX idx_hs_india ON hs_code_reference(india_hs_code);
+CREATE INDEX idx_hs_usa ON hs_code_reference(usa_hts_code);
