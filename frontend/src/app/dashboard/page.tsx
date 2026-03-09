@@ -16,6 +16,7 @@ import {
 interface TopMarket {
   country: string;
   hs_code: string;
+  product_description?: string | null;
   opportunity_score: number;
   ai_summary?: string;
 }
@@ -106,7 +107,9 @@ useEffect(() => {
                     <div className="min-w-0">
                       <div className="font-semibold truncate">{m.country}</div>
                       <div className="text-xs text-[var(--text-secondary)]">
-                        HS {m.hs_code}
+                        {m.product_description
+                          ? `HS ${m.hs_code} · ${m.product_description}`
+                          : `HS ${m.hs_code}`}
                       </div>
                     </div>
                     <div className="text-right shrink-0 ml-3">

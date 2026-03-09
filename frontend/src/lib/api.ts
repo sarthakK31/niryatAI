@@ -105,3 +105,10 @@ export const profile = {
     state?: string;
   }) => request("/profile/", { method: "PUT", body: JSON.stringify(data) }),
 };
+
+// HS Code Reference
+export const hsCodes = {
+  search: (q: string) => request(`/hs-codes/search?q=${encodeURIComponent(q)}`),
+  descriptions: (codes: string[]) =>
+    request("/hs-codes/descriptions", { method: "POST", body: JSON.stringify(codes) }),
+};

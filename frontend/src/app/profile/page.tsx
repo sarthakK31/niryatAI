@@ -1,8 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import AuthLayout from "@/components/AuthLayout";
-import { profile as profileApi } from "@/lib/api";
-import { User, Save, Plus, X } from "lucide-react";
+import { profile as profileApi, hsCodes as hsCodesApi } from "@/lib/api";
+import { User, Save, Plus, X, Search } from "lucide-react";
 
 interface ProfileData {
   id: string;
@@ -13,6 +13,11 @@ interface ProfileData {
   state: string | null;
 }
 
+interface HsSearchResult {
+  hs_code: string;
+  product_description: string | null;
+}
+
 export default function ProfilePage() {
   const [data, setData] = useState<ProfileData | null>(null);
   const [form, setForm] = useState({
@@ -21,9 +26,14 @@ export default function ProfilePage() {
     state: "",
   });
   const [hsCodes, setHsCodes] = useState<string[]>([]);
+  const [hsDescriptions, setHsDescriptions] = useState<Record<string, string>>({});
   const [newHsCode, setNewHsCode] = useState("");
+  const [searchResults, setSearchResults] = useState<HsSearchResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     profileApi.get().then((d: ProfileData) => {
@@ -34,15 +44,51 @@ export default function ProfilePage() {
         state: d.state || "",
       });
       setHsCodes(d.hs_codes || []);
+      // Fetch descriptions for existing codes
+      if (d.hs_codes && d.hs_codes.length > 0) {
+        hsCodesApi.descriptions(d.hs_codes).then(setHsDescriptions).catch(console.error);
+      }
     }).catch(console.error);
   }, []);
 
-  const addHsCode = () => {
-    const code = newHsCode.trim();
-    if (code && !hsCodes.includes(code)) {
-      setHsCodes((prev) => [...prev, code]);
-      setNewHsCode("");
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const handleSearchInput = (value: string) => {
+    setNewHsCode(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
     }
+    searchTimeout.current = setTimeout(() => {
+      hsCodesApi.search(value.trim()).then((results: HsSearchResult[]) => {
+        setSearchResults(results);
+        setShowDropdown(results.length > 0);
+      }).catch(console.error);
+    }, 300);
+  };
+
+  const addHsCode = (code: string, description?: string | null) => {
+    const trimmed = code.trim();
+    if (trimmed && !hsCodes.includes(trimmed)) {
+      setHsCodes((prev) => [...prev, trimmed]);
+      if (description) {
+        setHsDescriptions((prev) => ({ ...prev, [trimmed]: description }));
+      }
+    }
+    setNewHsCode("");
+    setShowDropdown(false);
+    setSearchResults([]);
   };
 
   const removeHsCode = (code: string) => {
@@ -62,6 +108,10 @@ export default function ProfilePage() {
       console.log("[DEBUG] Updated profile:", updated);
       setData(updated);
       setHsCodes(updated.hs_codes || []);
+      // Refresh descriptions
+      if (updated.hs_codes && updated.hs_codes.length > 0) {
+        hsCodesApi.descriptions(updated.hs_codes).then(setHsDescriptions).catch(console.error);
+      }
       // Update localStorage
       localStorage.setItem("niryat_user", JSON.stringify(updated));
       setMessage("Profile updated successfully!");
@@ -136,40 +186,95 @@ export default function ProfilePage() {
               Your Product HS Codes
             </label>
             <p className="text-xs text-[var(--text-secondary)] mb-2">
-              Add the HS codes for the products you export or want to export. This helps us
-              personalize market recommendations.
+              Search by product name or HS code to find and add your export products.
             </p>
+
+            {/* HS Code badges with descriptions */}
             <div className="flex flex-wrap gap-2 mb-3">
               {hsCodes.map((code) => (
                 <span
                   key={code}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-[var(--primary)] rounded-full text-sm"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)] rounded-full text-sm"
                 >
-                  HS {code}
+                  <span className="font-medium">HS {code}</span>
+                  {hsDescriptions[code] && (
+                    <span className="text-blue-200 text-xs ml-0.5">
+                      &middot; {hsDescriptions[code]}
+                    </span>
+                  )}
                   <button
                     onClick={() => removeHsCode(code)}
-                    className="hover:text-red-300 transition-colors"
+                    className="hover:text-red-300 transition-colors ml-1"
                   >
                     <X size={14} />
                   </button>
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newHsCode}
-                onChange={(e) => setNewHsCode(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addHsCode())}
-                placeholder="e.g. 0901"
-                className="flex-1 px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
-              />
-              <button
-                onClick={addHsCode}
-                className="px-4 py-2.5 rounded-lg bg-[var(--border)] hover:bg-[var(--primary)] text-[var(--text-primary)] hover:text-white transition-colors"
-              >
-                <Plus size={20} />
-              </button>
+
+            {/* Search input with autocomplete */}
+            <div className="relative" ref={dropdownRef}>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+                  <input
+                    type="text"
+                    value={newHsCode}
+                    onChange={(e) => handleSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (searchResults.length > 0) {
+                          addHsCode(searchResults[0].hs_code, searchResults[0].product_description);
+                        } else if (newHsCode.trim()) {
+                          addHsCode(newHsCode);
+                        }
+                      }
+                    }}
+                    onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
+                    placeholder="Search by product name or HS code..."
+                    className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (searchResults.length > 0) {
+                      addHsCode(searchResults[0].hs_code, searchResults[0].product_description);
+                    } else if (newHsCode.trim()) {
+                      addHsCode(newHsCode);
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-lg bg-[var(--border)] hover:bg-[var(--primary)] text-[var(--text-primary)] hover:text-white transition-colors"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+
+              {/* Autocomplete dropdown */}
+              {showDropdown && searchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.hs_code}
+                      onClick={() => addHsCode(result.hs_code, result.product_description)}
+                      disabled={hsCodes.includes(result.hs_code)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-[var(--border)]/40 transition-colors flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-sm">HS {result.hs_code}</span>
+                        {result.product_description && (
+                          <span className="text-xs text-[var(--text-secondary)] ml-2">
+                            {result.product_description}
+                          </span>
+                        )}
+                      </div>
+                      {hsCodes.includes(result.hs_code) && (
+                        <span className="text-xs text-[var(--text-secondary)] shrink-0">Added</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

@@ -8,6 +8,7 @@ import { Globe2, TrendingUp, Shield, Filter, Map } from "lucide-react";
 interface MarketRow {
   country: string;
   hs_code: string;
+  product_description?: string | null;
   avg_growth_5y: number | null;
   volatility: number | null;
   total_import: number | null;
@@ -16,23 +17,28 @@ interface MarketRow {
   risk_score: number | null;
 }
 
+interface HsCodeOption {
+  hs_code: string;
+  product_description: string | null;
+}
+
 export default function MarketsPage() {
   const [data, setData] = useState<MarketRow[]>([]);
   const [mapData, setMapData] = useState<MapMarket[]>([]);
-  const [hsCodes, setHsCodes] = useState<string[]>([]);
+  const [hsCodeOptions, setHsCodeOptions] = useState<HsCodeOption[]>([]);
   const [selectedHs, setSelectedHs] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    markets.hsCodes().then(setHsCodes).catch(console.error);
-    markets.top().then((d) => { setData(d); setLoading(false); }).catch(console.error);
+    markets.hsCodes().then(setHsCodeOptions).catch(console.error);
+    markets.top().then((d: MarketRow[]) => { setData(d); setLoading(false); }).catch(console.error);
     markets.mapData().then(setMapData).catch(console.error);
   }, []);
 
   const filterByHs = (code: string) => {
     setSelectedHs(code);
     setLoading(true);
-    markets.top(code || undefined).then((d) => { setData(d); setLoading(false); }).catch(console.error);
+    markets.top(code || undefined).then((d: MarketRow[]) => { setData(d); setLoading(false); }).catch(console.error);
   };
 
   const formatImport = (val: number | null) => {
@@ -54,6 +60,22 @@ export default function MarketsPage() {
     if (score >= 0.7) return "text-red-400";
     if (score >= 0.4) return "text-[var(--accent)]";
     return "text-[var(--success)]";
+  };
+
+  // Build a description lookup from all available sources
+  const descriptionMap: Record<string, string> = {};
+  for (const opt of hsCodeOptions) {
+    if (opt.product_description) descriptionMap[opt.hs_code] = opt.product_description;
+  }
+  for (const row of data) {
+    if (row.product_description && !descriptionMap[row.hs_code]) {
+      descriptionMap[row.hs_code] = row.product_description;
+    }
+  }
+
+  const formatHsLabel = (code: string) => {
+    const desc = descriptionMap[code];
+    return desc ? `HS ${code} · ${desc}` : `HS ${code}`;
   };
 
   // Filter map data by selected HS code
@@ -83,9 +105,9 @@ export default function MarketsPage() {
               className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] text-sm focus:border-[var(--primary-light)] focus:outline-none"
             >
               <option value="">All My HS Codes</option>
-              {hsCodes.map((code) => (
-                <option key={code} value={code}>
-                  HS {code}
+              {hsCodeOptions.map((opt) => (
+                <option key={opt.hs_code} value={opt.hs_code}>
+                  {formatHsLabel(opt.hs_code)}
                 </option>
               ))}
             </select>
@@ -115,7 +137,9 @@ export default function MarketsPage() {
                   #{i + 1}
                 </div>
                 <h3 className="text-xl font-bold">{row.country}</h3>
-                <p className="text-sm text-[var(--text-secondary)]">HS {row.hs_code}</p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {formatHsLabel(row.hs_code)}
+                </p>
                 <div className="mt-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-[var(--text-secondary)]">Opportunity Score</span>
@@ -140,7 +164,7 @@ export default function MarketsPage() {
         )}
 
         {/* No data message */}
-        {!loading && data.length === 0 && hsCodes.length === 0 && (
+        {!loading && data.length === 0 && hsCodeOptions.length === 0 && (
           <div className="bg-[var(--bg-card)] rounded-xl p-8 border border-[var(--border)] text-center">
             <Globe2 size={48} className="mx-auto text-[var(--text-secondary)] mb-3" />
             <h3 className="text-lg font-semibold mb-1">No HS Codes Configured</h3>
@@ -160,7 +184,7 @@ export default function MarketsPage() {
                 <tr className="border-b border-[var(--border)] text-[var(--text-secondary)]">
                   <th className="text-left px-4 py-3 font-medium">#</th>
                   <th className="text-left px-4 py-3 font-medium">Country</th>
-                  <th className="text-left px-4 py-3 font-medium">HS Code</th>
+                  <th className="text-left px-4 py-3 font-medium">Product</th>
                   <th className="text-right px-4 py-3 font-medium">
                     <div className="flex items-center justify-end gap-1">
                       <TrendingUp size={14} /> Score
@@ -196,7 +220,12 @@ export default function MarketsPage() {
                     >
                       <td className="px-4 py-3 text-[var(--text-secondary)]">{i + 1}</td>
                       <td className="px-4 py-3 font-medium">{row.country}</td>
-                      <td className="px-4 py-3">{row.hs_code}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{row.product_description || `HS ${row.hs_code}`}</div>
+                        {row.product_description && (
+                          <div className="text-xs text-[var(--text-secondary)]">HS {row.hs_code}</div>
+                        )}
+                      </td>
                       <td className={`px-4 py-3 text-right font-bold ${scoreColor(row.opportunity_score)}`}>
                         {row.opportunity_score?.toFixed(2) ?? "—"}
                       </td>

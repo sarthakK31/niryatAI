@@ -68,6 +68,7 @@ const HS_COLORS = [
 export interface MapMarket {
   country: string;
   hs_code: string;
+  product_description?: string | null;
   opportunity_score: number | null;
   total_import?: number | null;
   avg_growth_5y?: number | null;
@@ -84,21 +85,28 @@ export default function ExportMap({ data, compact = false }: ExportMapProps) {
   } | null>(null);
 
   // Build lookup: ISO code -> list of market entries
-  const { countryMap, hsCodeColors, hsCodes } = useMemo(() => {
+  const { countryMap, hsCodeColors, hsCodes, hsDescriptions } = useMemo(() => {
     const codes = [...new Set(data.map((d) => d.hs_code))].sort();
     const colorMap: Record<string, typeof HS_COLORS[0]> = {};
     codes.forEach((c, i) => { colorMap[c] = HS_COLORS[i % HS_COLORS.length]; });
 
+    // Build description map from data
+    const descMap: Record<string, string> = {};
+    for (const entry of data) {
+      if (entry.product_description && !descMap[entry.hs_code]) {
+        descMap[entry.hs_code] = entry.product_description;
+      }
+    }
+
     const cMap = new Map<string, MapMarket[]>();
     for (const entry of data) {
-      // const iso = COUNTRY_TO_ISO[entry.country];
       const iso = COUNTRY_TO_ISO[entry.country.trim()];
       console.log("[DEBUG DATA] Country → ISO:", entry.country, "→", iso);
       if (!iso) continue;
       if (!cMap.has(iso)) cMap.set(iso, []);
       cMap.get(iso)!.push(entry);
     }
-    return { countryMap: cMap, hsCodeColors: colorMap, hsCodes: codes };
+    return { countryMap: cMap, hsCodeColors: colorMap, hsCodes: codes, hsDescriptions: descMap };
   }, [data]);
 
   console.log("[DEBUG COUNTRY MAP KEYS]", [...countryMap.keys()]);
@@ -135,7 +143,9 @@ export default function ExportMap({ data, compact = false }: ExportMapProps) {
                 className="w-3 h-3 rounded-sm"
                 style={{ backgroundColor: hsCodeColors[code].base }}
               />
-              <span className="text-[var(--text-secondary)]">HS {code}</span>
+              <span className="text-[var(--text-secondary)]">
+                HS {code}{hsDescriptions[code] ? ` · ${hsDescriptions[code]}` : ""}
+              </span>
             </div>
           ))}
         </div>
@@ -221,7 +231,7 @@ export default function ExportMap({ data, compact = false }: ExportMapProps) {
             >
               <div className="flex justify-between gap-4">
                 <span style={{ color: hsCodeColors[item.hs_code]?.base }}>
-                  HS {item.hs_code}
+                  HS {item.hs_code}{item.product_description ? ` · ${item.product_description}` : ""}
                 </span>
                 <span className="font-bold">
                   Score: {item.opportunity_score?.toFixed(2) ?? "N/A"}

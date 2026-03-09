@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_pool
-from app.routes import auth, chat, readiness, markets, profile, dashboard, debug
+from app.routes import auth, chat, readiness, markets, profile, dashboard, debug, hs_codes
 
 app = FastAPI(
     title="Niryat AI",
@@ -32,8 +32,10 @@ app.include_router(markets.router)
 app.include_router(profile.router)
 app.include_router(dashboard.router)
 app.include_router(debug.router)
+app.include_router(hs_codes.router)
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok", "service": "niryat-ai"}

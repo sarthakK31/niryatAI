@@ -178,4 +178,3 @@ CREATE TABLE hs_code_reference (
 
 CREATE INDEX idx_hs_reference_code ON hs_code_reference(hs_code);
 CREATE INDEX idx_hs_india ON hs_code_reference(india_hs_code);
-CREATE INDEX idx_hs_usa ON hs_code_reference(usa_hts_code);

@@ -34,7 +34,8 @@ You have access to these tools — ALWAYS use them instead of guessing:
 
    Tables available:
    - market_intelligence (country, hs_code, avg_growth_5y, volatility, total_import, opportunity_score, ai_summary)
-   - country_risk (country, stability_index, risk_score)  
+   - country_risk (country, stability_index, risk_score)
+   - hs_code_reference (hs_code, product_description) — maps HS codes to human-readable product names
 
 2. S3 DOCUMENT STORE (export procedures):
    - search_export_docs: Search for export guidance documents by keyword
@@ -62,10 +63,12 @@ CRITICAL RULES — YOU MUST FOLLOW THESE:
 
 3. SQL RULES:
    - Only generate SELECT queries. Never INSERT, UPDATE, DELETE, DROP, or ALTER.
-   - Only query these tables: market_intelligence, country_risk
+   - Only query these tables: market_intelligence, country_risk, hs_code_reference
    - When filtering by country or hs_code, use ILIKE for flexible matching.
    - Always LIMIT results to 25 rows unless the user asks for more.
-   - Example good query: SELECT country, opportunity_score, ai_summary FROM market_intelligence WHERE hs_code = '0901' ORDER BY opportunity_score DESC LIMIT 10
+   - When a user describes their product by name (e.g. "coffee", "textiles"), use hs_code_reference to find the matching HS code: SELECT hs_code, product_description FROM hs_code_reference WHERE product_description ILIKE '%keyword%' LIMIT 10
+   - When showing HS codes to users, always include the product description so they understand what the code means.
+   - Example good query: SELECT mi.country, mi.hs_code, hr.product_description, mi.opportunity_score, mi.ai_summary FROM market_intelligence mi LEFT JOIN hs_code_reference hr ON hr.hs_code = mi.hs_code WHERE mi.hs_code = '0901' ORDER BY mi.opportunity_score DESC LIMIT 10
 
 4. EXPLAIN YOUR REASONING.
    When you give a recommendation, explain WHY. For example:
@@ -109,7 +112,7 @@ def _get_s3_client():
     return boto3.client("s3", region_name=AWS_REGION)
 
 
-ALLOWED_TABLES = {"market_intelligence", "country_risk"}
+ALLOWED_TABLES = {"market_intelligence", "country_risk", "hs_code_reference"}
 BLOCKED_KEYWORDS = {"insert", "update", "delete", "drop", "alter", "truncate", "create", "grant", "revoke"}
 
 # Current user context — set before each agent invocation
@@ -164,7 +167,7 @@ def get_table_info() -> str:
         df = pd.read_sql("""
             SELECT table_name, column_name, data_type
             FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name IN ('market_intelligence', 'country_risk')
+            WHERE table_schema = 'public' AND table_name IN ('market_intelligence', 'country_risk', 'hs_code_reference')
             ORDER BY table_name, ordinal_position
         """, conn)
         conn.close()
@@ -470,10 +473,19 @@ def run_agent_with_context(
     parts = []
 
     if user_profile:
+        hs_codes = user_profile.get('hs_codes') or []
+        # Resolve HS codes to product descriptions
+        hs_labels = []
+        if hs_codes:
+            from app.services.hs_lookup import get_descriptions_for_codes
+            desc_map = get_descriptions_for_codes(hs_codes)
+            for code in hs_codes:
+                desc = desc_map.get(code)
+                hs_labels.append(f"{code} ({desc})" if desc else code)
         profile_ctx = f"""User Profile: (Use this to personalize responses)
 - Name: {user_profile.get('full_name', 'Unknown')}
 - Company: {user_profile.get('company_name', 'Not specified')}
-- Products (HS codes): {', '.join(user_profile.get('hs_codes') or ['Not specified'])}
+- Products (HS codes): {', '.join(hs_labels) if hs_labels else 'Not specified'}
 - State: {user_profile.get('state', 'Not specified')}"""
         parts.append(profile_ctx)
 
