@@ -103,7 +103,7 @@ export default function ProfilePage() {
               type="text"
               value={form.full_name}
               onChange={(e) => setForm((p) => ({ ...p, full_name: e.target.value }))}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function ProfilePage() {
               type="text"
               value={form.company_name}
               onChange={(e) => setForm((p) => ({ ...p, company_name: e.target.value }))}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -126,7 +126,7 @@ export default function ProfilePage() {
               value={form.state}
               onChange={(e) => setForm((p) => ({ ...p, state: e.target.value }))}
               placeholder="e.g. Maharashtra"
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -162,11 +162,11 @@ export default function ProfilePage() {
                 onChange={(e) => setNewHsCode(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addHsCode())}
                 placeholder="e.g. 0901"
-                className="flex-1 px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
               />
               <button
                 onClick={addHsCode}
-                className="px-4 py-2.5 rounded-lg bg-[var(--border)] hover:bg-[var(--primary)] text-white transition-colors"
+                className="px-4 py-2.5 rounded-lg bg-[var(--border)] hover:bg-[var(--primary)] text-[var(--text-primary)] hover:text-white transition-colors"
               >
                 <Plus size={20} />
               </button>
@@ -178,8 +178,8 @@ export default function ProfilePage() {
             <div
               className={`px-4 py-2 rounded-lg text-sm ${
                 message.includes("success")
-                  ? "bg-green-900/30 border border-green-700 text-green-300"
-                  : "bg-red-900/30 border border-red-700 text-red-300"
+                  ? "bg-[var(--success-bg)] border border-[var(--success-border)] text-[var(--success-text)]"
+                  : "bg-[var(--error-bg)] border border-[var(--error-border)] text-[var(--error-text)]"
               }`}
             >
               {message}

@@ -157,7 +157,7 @@ export default function ReadinessPage() {
                             className={`text-sm ${
                               sub.completed
                                 ? "line-through text-[var(--text-secondary)]"
-                                : "text-white"
+                                : "text-[var(--text-primary)]"
                             }`}
                           >
                             {sub.title}

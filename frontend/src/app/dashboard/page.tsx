@@ -186,7 +186,7 @@ useEffect(() => {
                 </p>
               </div>
               <ArrowRight
-                className="text-[var(--text-secondary)] group-hover:text-white transition-colors"
+                className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors"
                 size={20}
               />
             </div>
@@ -207,7 +207,7 @@ useEffect(() => {
                 </p>
               </div>
               <ArrowRight
-                className="text-[var(--text-secondary)] group-hover:text-white transition-colors"
+                className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors"
                 size={20}
               />
             </div>

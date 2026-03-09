@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Dark theme (default) */
 :root {
   --primary: #1e40af;
   --primary-light: #3b82f6;
@@ -10,10 +11,36 @@
   --text-secondary: #94a3b8;
   --success: #22c55e;
   --border: #334155;
+  --error-bg: rgba(127, 29, 29, 0.3);
+  --error-border: #b91c1c;
+  --error-text: #fca5a5;
+  --success-bg: rgba(20, 83, 45, 0.3);
+  --success-border: #15803d;
+  --success-text: #86efac;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --primary: #1e40af;
+  --primary-light: #2563eb;
+  --accent: #d97706;
+  --bg-dark: #f1f5f9;
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --success: #16a34a;
+  --border: #e2e8f0;
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+  --error-text: #b91c1c;
+  --success-bg: #f0fdf4;
+  --success-border: #86efac;
+  --success-text: #15803d;
 }
 
 body {
   background: var(--bg-dark);
   color: var(--text-primary);
   font-family: system-ui, -apple-system, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }

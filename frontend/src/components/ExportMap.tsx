@@ -105,7 +105,7 @@ export default function ExportMap({ data, compact = false }: ExportMapProps) {
 
   const getCountryFill = (iso: string) => {
     const items = countryMap.get(iso);
-    if (!items || items.length === 0) return "#1e293b";
+    if (!items || items.length === 0) return "var(--bg-card)";
     // Use the HS code with the highest opportunity score for color
     const best = items.reduce((a, b) =>
       (a.opportunity_score ?? 0) >= (b.opportunity_score ?? 0) ? a : b
@@ -186,11 +186,11 @@ export default function ExportMap({ data, compact = false }: ExportMapProps) {
                     key={geo.rsmKey}
                     geography={geo}
                     fill={getCountryFill(iso)}
-                    stroke="#334155"
+                    stroke="var(--border)"
                     strokeWidth={0.5}
                     style={{
-                      hover: { fill: items ? "#fbbf24" : "#334155", cursor: items ? "pointer" : "default" },
-                      pressed: { fill: items ? "#f59e0b" : "#334155" },
+                      hover: { fill: items ? "#fbbf24" : "var(--border)", cursor: items ? "pointer" : "default" },
+                      pressed: { fill: items ? "#f59e0b" : "var(--border)" },
                     }}
                     onMouseEnter={(evt) => {
                       if (!items) return;

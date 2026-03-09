@@ -49,7 +49,7 @@ export default function LoginPage() {
           <h2 className="text-xl font-semibold text-center">Sign In</h2>
 
           {error && (
-            <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-2 rounded-lg text-sm">
+            <div className="bg-[var(--error-bg)] border border-[var(--error-border)] text-[var(--error-text)] px-4 py-2 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -61,7 +61,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 

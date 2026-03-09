@@ -54,7 +54,7 @@ export default function RegisterPage() {
           <h2 className="text-xl font-semibold text-center">Create Account</h2>
 
           {error && (
-            <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-2 rounded-lg text-sm">
+            <div className="bg-[var(--error-bg)] border border-[var(--error-border)] text-[var(--error-text)] px-4 py-2 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -66,7 +66,7 @@ export default function RegisterPage() {
               required
               value={form.full_name}
               onChange={(e) => update("full_name", e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -77,7 +77,7 @@ export default function RegisterPage() {
               required
               value={form.email}
               onChange={(e) => update("email", e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -89,7 +89,7 @@ export default function RegisterPage() {
               minLength={6}
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -101,7 +101,7 @@ export default function RegisterPage() {
               type="text"
               value={form.company_name}
               onChange={(e) => update("company_name", e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function RegisterPage() {
               value={form.state}
               onChange={(e) => update("state", e.target.value)}
               placeholder="e.g. Maharashtra"
-              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
             />
           </div>
 

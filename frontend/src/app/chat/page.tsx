@@ -134,7 +134,7 @@ export default function ChatPage() {
                     <button
                       key={q}
                       onClick={() => setInput(q)}
-                      className="px-3 py-1.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:text-white hover:border-[var(--primary-light)] transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary-light)] transition-colors"
                     >
                       {q}
                     </button>
@@ -199,7 +199,7 @@ export default function ChatPage() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--primary-light)] transition-colors"
+                className="p-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary-light)] transition-colors"
                 title="Upload image"
               >
                 <ImagePlus size={20} />
@@ -210,7 +210,7 @@ export default function ChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                 placeholder="Ask about exporting, markets, compliance..."
-                className="flex-1 px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-white focus:border-[var(--primary-light)] focus:outline-none"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-[var(--bg-dark)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--primary-light)] focus:outline-none"
                 disabled={sending}
               />
               <button

@@ -80,7 +80,7 @@ export default function MarketsPage() {
             <select
               value={selectedHs}
               onChange={(e) => filterByHs(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-white text-sm focus:border-[var(--primary-light)] focus:outline-none"
+              className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] text-sm focus:border-[var(--primary-light)] focus:outline-none"
             >
               <option value="">All My HS Codes</option>
               {hsCodes.map((code) => (
